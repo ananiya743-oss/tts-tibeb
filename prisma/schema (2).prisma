@@ -1,0 +1,217 @@
+// TT's Tibeb — Full e-commerce + admin system schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         String   @default("admin") // admin | super_admin
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  image       String?
+  active      Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id          String          @id @default(cuid())
+  title       String
+  slug        String          @unique
+  description String
+  fabricInfo  String          @default("")
+  careInfo    String          @default("")
+  price       Float
+  salePrice   Float?
+  sku         String?
+  images      String          // JSON array
+  sizes       String          // JSON array
+  category    String
+  inStock     Boolean         @default(true)
+  stockCount  Int             @default(0)
+  featured    Boolean         @default(false)
+  discount    Float           @default(0)
+  rating      Float           @default(5)
+  reviewCount Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  reviews     ProductReview[]
+  orderItems  OrderItem[]
+}
+
+model ProductReview {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  author    String
+  rating    Int
+  comment   String
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id                       String                @id @default(cuid())
+  orderNumber              String                @unique
+  // Customer
+  customerName             String
+  customerPhone            String
+  customerEmail            String
+  // Location
+  country                  String                @default("Ethiopia")
+  region                   String?
+  city                     String?
+  subCity                  String?
+  shippingAddress          String
+  // Order meta
+  measurements             String?
+  notes                    String?
+  paymentMethod            String                @default("arifpay")
+  // Money
+  subtotal                 Float                 @default(0)
+  shippingCost             Float                 @default(0)
+  discount                 Float                 @default(0)
+  tax                      Float                 @default(0)
+  totalAmount              Float                 @default(0)
+  // Status
+  status                   String                @default("new")
+  // Order-request workflow: "new" | "contacted" | "price_confirmed" | "processing"
+  // | "ready" | "shipped" | "delivered" | "cancelled"
+  // (legacy payment statuses still supported for old orders: paid, payment_failed, etc.)
+  isInternational          Boolean               @default(false)
+  // Customer's chosen contact platform: "gmail" | "whatsapp" | "telegram"
+  contactMethod            String?
+  // Payment (kept for backward compat — not used in order-request workflow)
+  arifPayTransactionId     String?
+  arifPayCheckoutUrl       String?
+  paymentDate              DateTime?
+  paymentVerificationStatus String?
+  paymentResponse          String?
+  items                    OrderItem[]
+  statusHistory            OrderStatusHistory[]
+  payment                  Payment?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+
+  @@index([status])
+  @@index([customerEmail])
+  @@index([country])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  title     String
+  price     Float
+  size      String?
+  quantity  Int
+  image     String?
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    String
+  note      String?
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model Payment {
+  id                  String   @id @default(cuid())
+  orderId             String   @unique
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider            String   @default("arifpay")
+  providerTransactionId String?
+  checkoutUrl         String?
+  amount              Float
+  currency            String   @default("ETB")
+  status              String   @default("pending") // pending | success | failed | cancelled | expired
+  rawResponse         String?
+  verified            Boolean  @default(false)
+  verifiedAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model HeroBanner {
+  id        String   @id @default(cuid())
+  headline  String
+  subtitle  String
+  imageUrl  String
+  ctaText   String
+  ctaLink   String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  message   String
+  link      String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Generic key-value store for site content (header, footer, about, contact, etc.)
+model SiteContent {
+  id        String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// Theme settings (color pickers, fonts, layout)
+model ThemeSetting {
+  id        String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// Media library
+model Media {
+  id        String   @id @default(cuid())
+  filename  String
+  url       String
+  mime      String
+  size      Int
+  alt       String?
+  createdAt DateTime @default(now())
+}
+
+// Admin notifications
+model Notification {
+  id        String   @id @default(cuid())
+  type      String   // new_order | payment_success | payment_failed | international_order | cancelled
+  title     String
+  message   String
+  orderId   String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([read])
+}
