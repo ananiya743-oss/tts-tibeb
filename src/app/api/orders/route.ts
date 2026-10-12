@@ -78,20 +78,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Please choose a valid contact method (Gmail, WhatsApp, or Telegram)' }, { status: 400 })
   }
 
-  const customerName = sanitize(customer?.fullName, 100)
-  const customerPhone = sanitize(customer?.phone, 30)
+  // Allow empty customer info — the customer provides details in the chat with the owner.
+  // We just need the order items + chosen contact method to create a record.
+  const customerName = sanitize(customer?.fullName, 100) || '—'
+  const customerPhone = sanitize(customer?.phone, 30) || '—'
   const customerEmail = sanitize(customer?.email, 100)
-  const country = sanitize(customer?.country, 60) || 'Ethiopia'
+  const country = sanitize(customer?.country, 60) || '—'
   const region = sanitize(customer?.region, 60)
-  const city = sanitize(customer?.city, 60)
+  const city = sanitize(customer?.city, 60) || '—'
   const subCity = sanitize(customer?.subCity, 60)
-  const shippingAddress = sanitize(customer?.address, 500)
+  const shippingAddress = sanitize(customer?.address, 500) || '—'
   const customerMessage = sanitize(customer?.message, 1000)
   const isIntl = !!isInternational
 
-  if (!customerName || !customerPhone || !shippingAddress || !city) {
-    return NextResponse.json({ error: 'Missing required fields (name, phone, city, address)' }, { status: 400 })
-  }
+  // Customer info is optional — customer provides details in the chat with the owner
+  // The only hard requirements are: items + contactMethod
 
   // Resolve products & build line items (price kept internally for admin records, never shown to customer)
   const lineItems: Array<{

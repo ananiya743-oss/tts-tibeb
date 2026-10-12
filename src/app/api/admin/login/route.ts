@@ -19,25 +19,37 @@ function check(ip: string): { ok: boolean; retryIn?: number } {
 }
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'local'
-  const limit = check(ip)
-  if (!limit.ok) {
+  try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'local'
+    const limit = check(ip)
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: `Too many login attempts. Try again in ${limit.retryIn}s.` },
+        { status: 429 }
+      )
+    }
+    const { email, password } = await req.json()
+    if (!email || !password) return NextResponse.json({ error: 'Missing credentials' }, { status: 400 })
+
+    const admin = await db.adminUser.findUnique({ where: { email: email.toLowerCase().trim() } })
+    if (!admin) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+
+    const ok = await verifyPassword(password, admin.passwordHash)
+    if (!ok) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+
+    await createSession(admin.id, admin.email)
+    // Reset attempts on success
+    ATTEMPTS.delete(ip)
+    return NextResponse.json({ admin: { id: admin.id, email: admin.email, name: admin.name, role: admin.role } })
+  } catch (error) {
+    console.error('[API /admin/login] Error:', error)
     return NextResponse.json(
-      { error: `Too many login attempts. Try again in ${limit.retryIn}s.` },
-      { status: 429 }
+      {
+        error: 'Server error during login',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        dbUrlSet: !!process.env.DATABASE_URL
+      },
+      { status: 500 }
     )
   }
-  const { email, password } = await req.json()
-  if (!email || !password) return NextResponse.json({ error: 'Missing credentials' }, { status: 400 })
-
-  const admin = await db.adminUser.findUnique({ where: { email: email.toLowerCase().trim() } })
-  if (!admin) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
-
-  const ok = await verifyPassword(password, admin.passwordHash)
-  if (!ok) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
-
-  await createSession(admin.id, admin.email)
-  // Reset attempts on success
-  ATTEMPTS.delete(ip)
-  return NextResponse.json({ admin: { id: admin.id, email: admin.email, name: admin.name, role: admin.role } })
 }

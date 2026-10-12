@@ -8,30 +8,42 @@ function safeParse(s: string | null, fallback: unknown) {
 }
 
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url)
-  const category = url.searchParams.get('category')
-  const featured = url.searchParams.get('featured')
-  const q = url.searchParams.get('q')
-  const limit = Number(url.searchParams.get('limit') || 0)
+  try {
+    const url = new URL(req.url)
+    const category = url.searchParams.get('category')
+    const featured = url.searchParams.get('featured')
+    const q = url.searchParams.get('q')
+    const limit = Number(url.searchParams.get('limit') || 0)
 
-  const where: Record<string, unknown> = {}
-  if (category) where.category = category
-  if (featured === 'true') where.featured = true
-  if (q) where.title = { contains: q }
+    const where: Record<string, unknown> = {}
+    if (category) where.category = category
+    if (featured === 'true') where.featured = true
+    if (q) where.title = { contains: q }
 
-  const products = await db.product.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    ...(limit ? { take: limit } : {})
-  })
+    const products = await db.product.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      ...(limit ? { take: limit } : {})
+    })
 
-  const result = products.map((p) => ({
-    ...p,
-    images: safeParse(p.images, []),
-    sizes: safeParse(p.sizes, [])
-  }))
+    const result = products.map((p) => ({
+      ...p,
+      images: safeParse(p.images, []),
+      sizes: safeParse(p.sizes, [])
+    }))
 
-  return NextResponse.json({ products: result })
+    return NextResponse.json({ products: result })
+  } catch (error) {
+    console.error('[API /products] Error:', error)
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch products',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        dbUrlSet: !!process.env.DATABASE_URL
+      },
+      { status: 500 }
+    )
+  }
 }
 
 export async function POST(req: NextRequest) {
