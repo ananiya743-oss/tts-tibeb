@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "npm install --legacy-peer-deps",
+  "installCommand": "npm install --legacy-peer-deps && npm install --legacy-peer-deps typescript @types/react @types/node @types/react-dom @types/bcryptjs",
   "buildCommand": "npx prisma generate && next build",
   "functions": {
     "src/app/api/**/*.ts": {
